@@ -1,7 +1,5 @@
-cat > .gitignore << 'EOF'
 # Bytecode cache
 __pycache__/
-__pycache__/*
 *.pyc
 *.pyo
 *.pyd
@@ -13,13 +11,14 @@ venv/
 env/
 ENV/
 
-# Outputs 
+# Generated outputs
 outputs/
+output/
+ploss_report_*.json
 *.csv
-*.json
 *.log
 
-# Local Database Storage
+# Local database
 ploss_analytics.db
 ploss_analytics.db-journal
 
@@ -52,7 +51,5 @@ MANIFEST
 .ipynb_checkpoints/
 *.ipynb
 
-# Misc
-*.log
+# Environment
 .env
-EOF
