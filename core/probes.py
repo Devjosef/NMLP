@@ -4,8 +4,8 @@ import socket
 import random
 
 def icmp_probe(target, packet_size=64, timeout=1):
-    param = '-n' if platform.system().lower()=='windows' else '-c'
-    cmd = ['ping', param, '1', '-s', str(packet_size-28), '-W', str(timeout * 1000), target]
+    param = "-n" if platform.system().lower() == "windows" else "-c"
+    cmd = ["ping", param, "1", "-s", str(packet_size - 28), "-W", str(timeout * 1000), target]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0
 

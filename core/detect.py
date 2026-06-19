@@ -17,7 +17,6 @@ class Detector:
         self.icmp_rate_limited = False
         self.udp_rate_limited = False 
         
-        # Counters for successes and failures
         self.icmp_failures = 0
         self.udp_failures = 0
         self.icmp_successes = 0
@@ -28,7 +27,7 @@ class Detector:
         self.udp_baseline = None
 
     def probe(self, target):
-        icmp_small=icmp_probe(target, 64)
+        icmp_small = icmp_probe(target, 64)
         icmp_large = icmp_probe(target, 512)
 
         icmp_success = int(icmp_small and icmp_large)
@@ -48,7 +47,6 @@ class Detector:
         if icmp_success == 0 and udp_ok:
             self.icmp_rate_limited = True
 
-
         return combined_loss
     
     def status(self):
@@ -66,9 +64,8 @@ class Detector:
             self.baseline_established = True
             total_probes = self.icmp_successes + self.icmp_failures + self.udp_successes + self.udp_failures
             return (f"ICMP base: {self.icmp_baseline*100:.1f}% "
-                   f"UDP base: {self.udp_baseline*100:.1f}% "
-                   f"(S:{self.icmp_successes+self.udp_successes}/{total_probes})")
-                   
+                    f"UDP base: {self.udp_baseline*100:.1f}% "
+                    f"(S:{self.icmp_successes+self.udp_successes}/{total_probes})")
 
         recent_losses = list(self.alert_losses)[-30:]
         recent_var = variance(recent_losses) if len(recent_losses) > 1 else 0
@@ -84,15 +81,13 @@ class Detector:
     
         if (icmp_recent > 0.1 or udp_recent > 0.1 or current_avg > 0.02):
             return (f"Loss: {current_avg*100:.1f}% "
-                f"ICMP: {icmp_recent*100:.1f}%  UDP: {udp_recent*100:.0f}%) "
-                f"S:{self.icmp_successes+self.udp_successes}/ {total_probes}")
-                
+                    f"ICMP: {icmp_recent*100:.1f}%  UDP: {udp_recent*100:.0f}%) "
+                    f"S:{self.icmp_successes+self.udp_successes}/ {total_probes}")
 
         return f"OK {current_avg*100:.1f}% (ICMP: {icmp_recent*100:.0f}%, UDP: {udp_recent*100:.0f}%)"
 
-
     def get_stats(self):
         return { 
-        'icmp': {'succ': self.icmp_successes, 'fail': self.icmp_failures},
-        'udp': {'succ': self.udp_successes, 'fail': self.udp_failures},}
-    
+            "icmp": {"succ": self.icmp_successes, "fail": self.icmp_failures},
+            "udp": {"succ": self.udp_successes, "fail": self.udp_failures}
+        }
