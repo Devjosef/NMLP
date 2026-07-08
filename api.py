@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict
 from core.storage import StorageManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("ploss_api")
+logger = logging.getLogger("nmpl_api")
 
 db = StorageManager()
 templates = Jinja2Templates(directory="templates")
@@ -30,7 +30,7 @@ async def lifespan(_: FastAPI):
         db.close()
 
 app = FastAPI(
-    title="Ploss API",
+    title="NMPL API",
     description="Continuous network diagnostics API",
     version="1.0.0",
     lifespan=lifespan
@@ -142,7 +142,7 @@ async def generate_report(incident_id: int):
         "raw_runlog": json.loads(row) if row else {}
     }
 
-    report_path = f"ploss_report_incident_{incident_id}.json"
+    report_path = f"nmpl_report_incident_{incident_id}.json"
     await asyncio.to_thread(Path(report_path).write_text, json.dumps(report_data, indent=2))
 
     return {

@@ -101,12 +101,12 @@ def generate_isp_report(incident_id: int):
         "evidence": {"bottleneck_hop": row[4], "bottleneck_host": row[5], "bottleneck_loss_pct": row[6]},
         "raw_runlog": json.loads(row[7])
     }
-    report_path = f"ploss_report_incident_{incident_id}.json"
+    report_path = f"nmpl_report_incident_{incident_id}.json"
     Path(report_path).write_text(json.dumps(report_data, indent=2))
     print(f"[REPORT] ISP-ready report saved to: {report_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Ploss - Continuous Network Diagnostics Daemon")
+    parser = argparse.ArgumentParser(description="NMPL - Continuous Network Diagnostics Daemon")
     parser.add_argument("--targets", required=False, help="Comma-separated target endpoints to monitor")
     parser.add_argument("--interval", type=float, default=3.0, help="Probe interval in seconds")
     parser.add_argument("--once", action="store_true", help="Single CLI run")

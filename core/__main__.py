@@ -11,7 +11,7 @@ def main_with_result(args_list=None):
     if args_list is None:
         args_list = sys.argv[1:]
     
-    parser = argparse.ArgumentParser(description="Ploss: Packet Loss Detector")
+    parser = argparse.ArgumentParser(description="NMPL: Packet Loss Detector")
     parser.add_argument("target", help="Target IP")
     parser.add_argument("--watch", action="store_true", help="Live monitoring")
     parser.add_argument("--mtr", action="store_true", help="per hop analysis")

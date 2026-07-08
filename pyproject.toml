@@ -3,13 +3,13 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ploss"
+name = "nmpl"
 version = "0.2.1"
-description = "Packet Loss Detector and Debugger"
+description = "No More Packet Loss"
 dependencies = []
 
 [project.scripts]
-ploss = "core.__main__:main"
+nmpl = "core.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["core*"]

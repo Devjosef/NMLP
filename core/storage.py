@@ -1,7 +1,7 @@
 import sqlite3
 import json
 
-DB_FILE = "ploss_analytics.db"
+DB_FILE = "nmpl_analytics.db"
 
 class StorageManager:
     def __init__(self):

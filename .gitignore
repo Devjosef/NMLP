@@ -19,6 +19,8 @@ ploss_report_*.json
 *.log
 
 # Local database
+nmpl_analytics.db
+nmpl_analytics.db-journal
 ploss_analytics.db
 ploss_analytics.db-journal
 

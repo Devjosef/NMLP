@@ -1,0 +1,140 @@
+{
+  "hops": [
+    {
+      "hop": 1,
+      "host": "192.168.1.1",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 3.9,
+      "avg": 20.9,
+      "best": 3.2,
+      "worst": 112.6
+    },
+    {
+      "hop": 2,
+      "host": "2.248.5.1",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 4.7,
+      "avg": 26.9,
+      "best": 3.3,
+      "worst": 97.9
+    },
+    {
+      "hop": 3,
+      "host": "81.228.85.239",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 5.7,
+      "avg": 17.9,
+      "best": 3.0,
+      "worst": 118.5
+    },
+    {
+      "hop": 4,
+      "host": "81.228.84.95",
+      "loss": 60.0,
+      "sent": 10,
+      "last": 7.1,
+      "avg": 17.2,
+      "best": 4.4,
+      "worst": 52.5
+    },
+    {
+      "hop": 5,
+      "host": "62.115.123.158",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 5.6,
+      "avg": 17.8,
+      "best": 4.1,
+      "worst": 122.9
+    },
+    {
+      "hop": 6,
+      "host": "62.115.143.6",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 25.0,
+      "avg": 40.7,
+      "best": 24.1,
+      "worst": 112.4
+    },
+    {
+      "hop": 7,
+      "host": "62.115.134.79",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 35.3,
+      "avg": 67.5,
+      "best": 34.0,
+      "worst": 157.5
+    },
+    {
+      "hop": 8,
+      "host": "62.115.140.215",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 14.3,
+      "avg": 34.9,
+      "best": 12.9,
+      "worst": 103.1
+    },
+    {
+      "hop": 9,
+      "host": "72.14.219.132",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 14.4,
+      "avg": 35.2,
+      "best": 13.4,
+      "worst": 143.9
+    },
+    {
+      "hop": 10,
+      "host": "142.251.79.127",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 16.3,
+      "avg": 42.7,
+      "best": 15.8,
+      "worst": 105.7
+    },
+    {
+      "hop": 11,
+      "host": "142.251.65.81",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 16.0,
+      "avg": 39.0,
+      "best": 14.7,
+      "worst": 136.0
+    },
+    {
+      "hop": 12,
+      "host": "8.8.8.8",
+      "loss": 0.0,
+      "sent": 10,
+      "last": 16.9,
+      "avg": 33.2,
+      "best": 15.7,
+      "worst": 106.1
+    }
+  ],
+  "analysis": {
+    "total_hops": 12,
+    "total_loss": 5.0,
+    "average_latency": 32.824999999999996,
+    "worst_latency": 157.5,
+    "bottleneck": {
+      "hop": 4,
+      "host": "81.228.84.95",
+      "loss": 60.0,
+      "avg_latency": 17.2
+    },
+    "forwardloss_inherited": false,
+    "likely_rate_limited": true,
+    "suggestion": "Hop 4 (81.228.84.95) is likely ICMP rate-limited. Destination is reachable with low loss."
+  },
+  "timestamp": "2026-07-08 12:56:04"
+}
