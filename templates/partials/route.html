@@ -1,0 +1,43 @@
+{# 
+  Data Mapping from /partials/route/{incident_id} endpoint:
+  hops = list of dictionaries parsed from raw JSON row[7]
+  analysis = dictionary containing extracted analyzer metrics
+#}
+
+<div class="node-track">
+    {% for hop in hops %}
+        {# Safe key extraction matching back-end data formats #}
+        {% set hop_host = hop.get('host') if hop is mapping else hop.host %}
+        {% set hop_num = hop.get('hop') if hop is mapping else hop.hop %}
+        {% set hop_loss = hop.get('loss') if hop is mapping else hop.loss %}
+        {% set hop_delay = hop.get('delay') if hop is mapping else hop.delay %}
+
+        {% set is_bottleneck = (hop_host == analysis.get('bottleneck_host') or hop_num == analysis.get('bottleneck_hop')) %}
+        
+        <div class="node-wrapper" style="display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; z-index: 2; min-width: 70px;">
+            
+            <div class="node-circle {% if is_bottleneck %}alert{% endif %}">
+                H{{ hop_num }}
+            </div>
+            
+            <div class="node-meta" style="margin-top: 8px; display: flex; flex-direction: column; gap: 2px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 10px;">
+                
+                <span class="{% if is_bottleneck %}text-red{% else %}text-cyan{% endif %}" style="font-weight: 600; max-width: 85px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ hop_host }}">
+                    {{ hop_host if hop_host else '*' }}
+                </span>
+                
+                <span class="text-muted">{{ hop_delay if hop_delay is not none else 0 }}ms</span>
+                
+                <span class="{% if hop_loss and hop_loss|float > 0 %}text-red{% else %}text-muted{% endif %}" 
+                      style="font-weight: 600;">
+                    {{ hop_loss if hop_loss is not none else 0.0 }}% loss
+                </span>
+            </div>
+            
+        </div>
+    {% else %}
+        <div class="text-muted mono" style="font-size: 11px; width: 100%; text-align: center; padding: 10px 0;">
+            No route trace details recorded for this sequence.
+        </div>
+    {% endfor %}
+</div>

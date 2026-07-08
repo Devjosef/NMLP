@@ -122,7 +122,11 @@ def main():
         
     target_list = [t.strip() for t in args.targets.split(",")] if args.targets else []
     if args.once or not target_list:
-        run_once([arg for arg in (unknown + target_list) if arg != "--once"])
+        if target_list:
+            for target in target_list:
+                run_once([arg for arg in (unknown + [target]) if arg != "--once"])
+        else:
+            run_once([arg for arg in unknown if arg != "--once"])
         return
     
     run_daemon(target_list, args.interval, unknown)

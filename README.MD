@@ -1,53 +1,69 @@
-# Ploss
-**Packet loss detector and debugger**
+# NMPL
+**No more packet loss**
 
 ## Overview
-
 Networks are unreliable. Packets get lost in transmission. Debugging the *where* and *why* is hard and convoluted.
 
-Ploss detects packet loss, localizes it to specific hops/segments, then suggests next steps. When you know exactly *where* it went wrong, fixing it becomes much easier.
+NMPL detects packet loss, localizes it to specific hops/segments, then suggests next steps. When you know exactly *where* it went wrong, fixing it becomes much easier.
 
 ## The Problem
 Packet loss is sporadic and hard to reproduce:
-
 - Loss only happens under certain conditions (like load)
 - Could be one bad router, cable, or ISP segment
 - Simple pings miss bursty or path-specific issues
 
-## What Ploss Does
-
-- **Detect** — Continuous probes catch sporadic loss
+## What NMPL Does
+- **Detect** — Continuous probes catch sporadic loss over ICMP and UDP
 - **Localize** — Per-hop visibility shows exactly where packets drop
-- **Document** - JSON/CSV exports for ISP support tickets
-- **Suggest** — Practical next steps based on patterns
+- **Document** — JSON/CSV exports for ISP support tickets
+- **Suggest** — Practical next steps based on automated bottleneck patterns
 
 ## Current Status
-Per-hop loss detection by mtr parsing
-Smart bottleneck analysis
-JSON/CSV ISP evidence export
-Live monitoring using the (--watch) command
-Cross-platform (macOS/linux)
+- Per-hop loss detection via automated `mtr` parsing
+- Smart bottleneck analysis with forward-loss inheritance checks
+- Multi-threaded daemon mode for parallel target monitoring
+- Compact SQLite3 database storage for analytics timeline and incidents
+- Native FastAPI web dashboard with HTMX live-reloading rows
+- JSON/CSV evidence export for ISP support tickets
+- Cross-platform support (macOS/Linux)
 
 ## Quick Start
 
-ploss 8.8.8.8                   # Basic loss test
-ploss 8.8.8.8 --mtr             # Traceroute + analysis  
-ploss 8.8.8.8 --mtr --json=proof.json --csv=hops.csv  # ISP evidence
-ploss 8.8.8.8 --watch           # Live monitoring
+### 1. Standalone CLI Probes
+```bash
+python3 -m core 8.8.8.8                # Basic loss test
+python3 -m core 8.8.8.8 --watch        # Live single-target monitoring
+python3 -m core 8.8.8.8 --mtr          # Traceroute + bottleneck analysis  
+python3 -m core 8.8.8.8 --mtr --json=proof.json --csv=hops.csv  # Export ISP evidence
+```
+
+### 2. Multi-Target Daemon Mode
+Monitor multiple endpoints and cloud servers concurrently over parallel execution threads:
+```bash
+python3 cli.py --targets "1.1.1.1,8.8.8.8,://amazonaws.com,github.com" --interval 3.0
+```
 
 
 ## Installation
-pip install ploss
-# or from source
-pip install git+https://github.com/Devjosef/Ploss
+```bash
+pip install nmpl
 
-## Scaling Directions (PLANNED)
-**Cloud Targets**
-ploss aws-ec2.eu-north.... --mtr
-ploss gcp-cloud.eu
+# or install from source
+git clone https://github.com
+cd NMPL
+pip install -r requirements.txt
+```
 
-## Multi-target (PLANNED)
-ploss --targets google,github,aws --mtr
+## Production Architecture
 
-## Agent mode (PLANNED)
-ploss-agent --server central-monitor.com
+### Cloud & Multi-Target Engine
+The core execution engine utilizes a `ThreadPoolExecutor` to handle scale across arbitrary cloud boundaries:
+```bash
+python3 cli.py --targets "://amazonaws.com,github.com,1.1.1.1" --interval 3.0
+```
+
+### Automated Diagnostic Records
+When a path degrades, the daemon breaks past its baseline and captures an autonomous trace snapshot, saving a production-ready entry into your local history file for later ISP escalation:
+```bash
+python3 cli.py --report 1
+```

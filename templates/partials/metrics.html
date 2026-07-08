@@ -1,0 +1,57 @@
+{% for row in rows %}
+{# 
+  Data Mapping from StorageManager tuple:
+  row[0] = id
+  row[1] = timestamp (e.g., "08:49:20")
+  row[2] = target (e.g., "1.1.1.1")
+  row[3] = summary / description (e.g., "Cloudflare DNS")
+  row[4] = status_flag (e.g., "ALERT" or "OK")
+  row[5] = latency_ms (e.g., 172)
+  row[6] = loss_pct (e.g., 8.7)
+  row[7] = jitter_ms (e.g., 51)
+#}
+<tr class="{% if row[4] == 'ALERT' %}active-incident-row{% else %}normal-row{% endif %}">
+    <td class="mono text-muted">{{ row[1] }}</td>
+    
+    <td>
+        <span style="font-weight: 600; color: #ffffff; display: block;">{{ row[2] }}</span>
+        <span class="text-muted" style="font-size: 11px; display: block;">{{ row[3] if row[3] else 'Unknown Target' }}</span>
+    </td>
+    
+    <td>
+        {% if row[4] == 'ALERT' %}
+            <span class="badge alert">⚠ ALERT</span>
+            <span class="text-muted mono" style="font-size: 11px; margin-left: 4px;">INC-0{{ row[0] }}</span>
+        {% else %}
+            <span class="badge ok">✓ OK</span>
+        {% endif %}
+    </td>
+    
+    <td>
+        <div class="mini-bar-wrapper">
+            {% if row[4] == 'ALERT' %}
+                <div class="mini-bar-fill alert" style="width: 75%;"></div>
+            {% else %}
+                <div class="mini-bar-fill ok" style="width: 25%;"></div>
+            {% endif %}
+        </div>
+        <span class="mono">{{ row[5] if row[5] is not none else 0 }}ms</span>
+    </td>
+    
+    <td>
+        <span class="mono {% if row[6] and row[6] > 0 %}text-red{% endif %}" style="font-weight: 600;">
+            {{ row[6] if row[6] is not none else 0.0 }}%
+        </span>
+    </td>
+    
+    <td>
+        <span class="text-muted mono">{{ row[7] if row[7] is not none else 0 }}ms</span>
+    </td>
+</tr>
+{% else %}
+<tr>
+    <td colspan="6" style="text-align: center; padding: 40px; color: #6c757d;">
+        No metric timeline logs available.
+    </td>
+</tr>
+{% endfor %}
