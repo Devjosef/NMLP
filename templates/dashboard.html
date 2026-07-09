@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Diagnostics Dashboard</title>
+    <title>NMPL Diagnostics Dashboard</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -13,7 +13,10 @@
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #11131c; padding: 12px 16px; border: 1px solid #1e2235; border-radius: 6px; }
         .system-title { display: flex; align-items: center; gap: 12px; }
         .brand { color: #00e5ff; font-weight: 700; font-family: monospace; letter-spacing: 1px; }
-        .status-pill { background: rgba(217, 119, 6, 0.1); color: #fbbf24; border: 1px solid rgba(217, 119, 6, 0.2); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .status-pill { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; border: 1px solid transparent; }
+        .status-pill.nominal { background: rgba(34, 197, 94, 0.1); color: #22c55e; border-color: rgba(34, 197, 94, 0.2); }
+        .status-pill.degraded { background: rgba(217, 119, 6, 0.1); color: #fbbf24; border-color: rgba(217, 119, 6, 0.2); }
+        .status-pill.failure { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); }
         .table-container { background: #11131c; border: 1px solid #1e2235; border-radius: 6px; overflow: hidden; }
         .table-header-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #1e2235; background: #151824; }
         .table-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa2b1; }
@@ -21,13 +24,16 @@
         th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid #161926; font-size: 13px; }
         th { background-color: #151824; color: #6c757d; font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
         tr.active-incident-row { background: rgba(239, 68, 68, 0.04); }
+        tr.active-incident-row:hover { background: rgba(239, 68, 68, 0.08); }
         tr.normal-row:hover { background: #181b28; }
+        .selected-timeline-row { background: rgba(0, 229, 255, 0.08) !important; box-shadow: inset 3px 0 0 0 #00e5ff; }
         .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; font-family: monospace; }
         .badge.ok { background-color: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.2); }
         .badge.alert { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
         .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
         .text-cyan { color: #00e5ff !important; }
         .text-red { color: #ef4444 !important; }
+        .text-white { color: #ffffff !important; }
         .text-muted { color: #6c757d; }
         .mini-bar-wrapper { width: 60px; background: #1e2235; height: 6px; border-radius: 3px; display: inline-block; vertical-align: middle; overflow: hidden; margin-right: 8px; }
         .mini-bar-fill { height: 100%; border-radius: 3px; }
@@ -47,14 +53,16 @@
         .b-value { font-size: 18px; font-weight: 700; color: #ffffff; }
         .route-path-box { border: 1px solid #1e2235; border-radius: 4px; padding: 14px; background: #151824; }
         .node-track { display: flex; justify-content: space-between; align-items: center; position: relative; margin-top: 10px; gap: 10px; }
-        .node-track::before { content: ''; position: absolute; left: 10px; right: 10px; top: 14px; height: 2px; background: #1e2235; z-index: 1; }
-        .node-circle { width: 30px; height: 30px; border-radius: 50%; background: #11131c; border: 2px solid #22c55e; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; position: relative; z-index: 2; color: #22c55e; }
-        .node-circle.alert { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+        .node-track::before { content: ''; position: absolute; left: 10px; right: 10px; top: 9px; height: 1px; background: #1e2235; z-index: 1; }
+        .node-circle { width: 20px; height: 20px; border-radius: 4px; background: #11131c; border: 1px solid #22c55e; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; position: relative; z-index: 2; color: #22c55e; }
+        .node-circle.alert { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
         .export-card { background: #151824; border: 1px solid #1e2235; padding: 16px; border-radius: 4px; display: flex; flex-direction: column; gap: 12px; }
         .btn-generate { background: #00e5ff; color: #0c0d12; width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; }
         .btn-generate:hover { background: #00b2cc; }
         .btn-generate:disabled { background: #1e2235; color: #6c757d; cursor: not-allowed; }
-        select { background: #151824; color: #ced4da; border: 1px solid #1e2235; padding: 6px 12px; border-radius: 4px; font-size: 12px; outline: none; }
+        .control-toolbar input { background: transparent; color: #ffffff; border: none; font-family: inherit; font-size: 11px; font-weight: 600; outline: none; width: 140px; }
+        .control-toolbar input::placeholder { color: #4b5563; }
+        .target-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -64,24 +72,42 @@
                 <div class="system-title">
                     <span class="brand">((•)) NMPL</span>
                     <span class="text-muted" style="font-size: 11px;">v1.0.0</span>
-                    <span class="status-pill">● DEGRADED</span>
+                    <span class="status-pill nominal" id="global-status">● NOMINAL</span>
                 </div>
-                <div>
-                    <select id="target-selector" name="target" 
+                
+                <div class="control-toolbar" style="display: flex; align-items: center; gap: 12px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px;">
+                    <div id="timestamp-target" style="color: #64748b;">
+                        LIVE MATRIX TELEMETRY
+                    </div>
+                    
+                    <div class="filter-box-wrapper" style="display: flex; align-items: center; background: #151824; border: 1px solid #1e2235; border-radius: 4px; padding: 6px 12px; color: #9aa2b1;">
+                        <span style="color: #6c757d; margin-right: 6px;">TARGET:</span>
+                        <input id="target-selector" 
+                               type="text" 
+                               name="target" 
+                               placeholder="ENTER HOST OR IP..." 
+                               hx-get="/partials/metrics" 
+                               hx-target="#timeline-body" 
+                               hx-swap="innerHTML"
+                               hx-trigger="keyup[keyCode==13], change"
+                               hx-on::after-request="htmx.ajax('GET', '/partials/engine', {target: '#incident-engine-panel', swap: 'innerHTML', values: {target: this.value}})">
+                    </div>
+                    
+                    <button class="btn-refresh" 
                             hx-get="/partials/metrics" 
                             hx-target="#timeline-body" 
+                            hx-include="#target-selector"
                             hx-swap="innerHTML"
-                            hx-on::after-request="htmx.ajax('GET', '/partials/engine', {target: '#incident-engine-panel', swap: 'innerHTML', values: {target: this.value}})">
-                        <option value="">TARGET: ALL TARGETS</option>
-                        <option value="8.8.8.8">8.8.8.8 (Google)</option>
-                        <option value="1.1.1.1">1.1.1.1 (Cloudflare)</option>
-                    </select>
+                            hx-on::after-request="this.setAttribute('disabled', 'true'); this.innerText = 'WAIT...'; setTimeout(() => { this.removeAttribute('disabled'); this.innerText = 'REFRESH'; }, 3000); htmx.ajax('GET', '/partials/engine', {target: '#incident-engine-panel', swap: 'innerHTML', values: {target: document.getElementById('target-selector').value}})"
+                            style="background: #151824; color: #ffffff; border: 1px solid #1e2235; border-radius: 4px; padding: 6px 12px; font-weight: 600; font-size: 11px; cursor: pointer; font-family: inherit;">
+                        REFRESH
+                    </button>
                 </div>
             </header>
 
             <div class="table-container">
                 <div class="table-header-bar">
-                    <div class="table-title">📊 Metrics Timeline</div>
+                    <div class="table-title">Metrics Timeline</div>
                     <div class="text-muted mono" style="font-size: 11px;">40 ENTRIES</div>
                 </div>
                 <table>

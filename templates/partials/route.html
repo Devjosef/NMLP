@@ -1,39 +1,30 @@
-{# 
-  Data Mapping from /partials/route/{incident_id} endpoint:
-  hops = list of dictionaries parsed from raw JSON row[7]
-  analysis = dictionary containing extracted analyzer metrics
-#}
-
-<div class="node-track">
+<div class="node-track" style="display: flex; justify-content: space-between; align-items: center; position: relative; margin-top: 18px; padding: 0 10px; gap: 12px; width: 100%;">
     {% for hop in hops %}
-        {# Safe key extraction matching back-end data formats #}
         {% set hop_host = hop.get('host') if hop is mapping else hop.host %}
         {% set hop_num = hop.get('hop') if hop is mapping else hop.hop %}
         {% set hop_loss = hop.get('loss') if hop is mapping else hop.loss %}
         {% set hop_delay = hop.get('delay') if hop is mapping else hop.delay %}
-
         {% set is_bottleneck = (hop_host == analysis.get('bottleneck_host') or hop_num == analysis.get('bottleneck_hop')) %}
-        
-        <div class="node-wrapper" style="display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; z-index: 2; min-width: 70px;">
-            
-            <div class="node-circle {% if is_bottleneck %}alert{% endif %}">
+        <div class="node-wrapper" 
+             hx-get="/partials/metrics?target={{ hop_host if hop_host else '' }}"
+             hx-target="#timeline-body"
+             hx-swap="innerHTML"
+             hx-on::after-request="if('{{ hop_host }}') { document.getElementById('target-selector').value = ''; }"
+             style="display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; z-index: 2; min-width: 50px; flex: 1; cursor: pointer;">
+            <div class="node-circle {% if is_bottleneck %}alert{% endif %}" style="width: 20px; height: 20px; border-radius: 4px; font-size: 10px; border-width: 1px; box-shadow: none;">
                 H{{ hop_num }}
             </div>
-            
-            <div class="node-meta" style="margin-top: 8px; display: flex; flex-direction: column; gap: 2px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 10px;">
-                
-                <span class="{% if is_bottleneck %}text-red{% else %}text-cyan{% endif %}" style="font-weight: 600; max-width: 85px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ hop_host }}">
-                    {{ hop_host if hop_host else '*' }}
+            <div class="node-meta" style="margin-top: 6px; display: flex; flex-direction: column; gap: 1px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 10px; width: 100%; overflow: hidden;">
+                <span class="{% if is_bottleneck %}text-red{% else %}text-muted{% endif %}" style="font-weight: 500; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; display: block;" title="{{ hop_host }}">
+                    {{ hop_host.split('.')[-2:]|join('.') if '.' in hop_host else hop_host or '*' }}
                 </span>
-                
-                <span class="text-muted">{{ hop_delay if hop_delay is not none else 0 }}ms</span>
-                
-                <span class="{% if hop_loss and hop_loss|float > 0 %}text-red{% else %}text-muted{% endif %}" 
-                      style="font-weight: 600;">
-                    {{ hop_loss if hop_loss is not none else 0.0 }}% loss
-                </span>
+                <span style="color: #ffffff;">{{ hop_delay if hop_delay is not none else 0 }}<span style="color: #4b5563;">ms</span></span>
+                {% if hop_loss and hop_loss|float > 0 %}
+                    <span class="text-red" style="font-weight: 600;">{{ hop_loss }}%</span>
+                {% else %}
+                    <span style="color: #4b5563;">0%</span>
+                {% endif %}
             </div>
-            
         </div>
     {% else %}
         <div class="text-muted mono" style="font-size: 11px; width: 100%; text-align: center; padding: 10px 0;">

@@ -1,51 +1,26 @@
 {% if incident %}
-{# 
-  Data Mapping from StorageManager tuple:
-  incident[0] = incident_id
-  incident[1] = timestamp
-  incident[2] = target
-  incident[3] = structural_fault_summary
-  incident[4] = bottleneck_hop
-  incident[5] = bottleneck_host
-  incident[6] = bottleneck_loss_pct
-#}
+<span class="status-pill failure" id="global-status" hx-swap-oob="true">● FAILURE</span>
 
 <div class="engine-header">
-    <div class="engine-title">
-        <span class="engine-dot"></span> INCIDENT ENGINE
+    <div class="engine-title" 
+         hx-get="/partials/engine" 
+         hx-include="#target-selector" 
+         hx-target="#incident-engine-panel" 
+         hx-swap="innerHTML" 
+         style="cursor: pointer;" 
+         title="Reset to live view">
+        <span class="engine-dot" style="background: #ef4444;"></span> INCIDENT ENGINE
     </div>
-    <div class="mono text-muted" style="font-size: 11px;">INC-{{ "%03d"|format(incident[0]) }}</div>
+    {% set incident_ts = incident[1] %}
+    <div class="mono text-muted" style="font-size: 11px;">INC-{{ "%03d"|format(incident[0]) }} • {{ incident_ts.split(' ')[1] if incident_ts and ' ' in incident_ts else incident_ts }}</div>
 </div>
 
 <div class="summary-block">
     {{ incident[3] }}
 </div>
 
-<div class="table-title" style="font-size: 11px; margin-bottom: -10px; color: #6c757d;">☉ BOTTLENECK INDICATOR</div>
-<div class="bottleneck-widget">
-    <div class="b-cell">
-        <div class="b-label">Hop Number</div>
-        <div class="b-value text-red">{{ incident[4] if incident[4] else 'N/A' }}</div>
-        <span class="text-muted" style="font-size: 10px; margin-top: 2px;">of 6 hops</span>
-    </div>
-    
-    <div class="b-cell">
-        <div class="b-label">Host Address</div>
-        <div class="b-value text-red mono" style="font-size: 14px; word-break: break-all;">
-            {{ incident[5] if incident[5] else 'Unknown' }}
-        </div>
-        <span class="text-muted" style="font-size: 10px; margin-top: 2px;">edge-85.cloudflare.com</span>
-    </div>
-    
-    <div class="b-cell">
-        <div class="b-label">Packet Loss</div>
-        <div class="b-value text-red">{{ incident[6] if incident[6] else '0.0' }}%</div>
-    </div>
-</div>
-
-<div class="route-path-box">
-    <div class="table-title" style="font-size: 11px; margin-bottom: 12px; color: #9aa2b1;">✦ ROUTE PATH — 6 HOPS TRACED</div>
-    
+<div class="route-path-box" style="margin-top: 16px;">
+    <div class="table-title" style="font-size: 11px; margin-bottom: 12px; color: #9aa2b1;">ROUTE PATH — 6 HOPS TRACED</div>
     <div hx-get="/partials/route/{{ incident[0] }}" 
          hx-trigger="load" 
          hx-swap="outerHTML">
@@ -53,31 +28,50 @@
     </div>
 </div>
 
-<div class="export-card">
+<div class="export-card" style="margin-top: 16px;">
     <div style="display: flex; flex-direction: column; gap: 4px;">
-        <div class="table-title" style="font-size: 11px; color: #9aa2b1;">📄 ISP EVIDENCE EXPORT</div>
+        <div class="table-title" style="font-size: 11px; color: #9aa2b1;">ISP EVIDENCE EXPORT</div>
         <p class="text-muted" style="font-size: 12px; line-height: 1.4; margin: 0;">
             Compile a structured JSON report with all trace data, timestamps, and route analysis for ISP escalation.
         </p>
     </div>
-    
     <button class="btn-generate" 
             hx-post="/report/{{ incident[0] }}" 
             hx-target="#report-status" 
             hx-swap="innerHTML"
-            onclick="this.setAttribute('disabled', 'true'); setTimeout(() => this.removeAttribute('disabled'), 2000)">
-        🗂 GENERATE REPORT
+            style="padding: 8px 16px; background: #fff700; color: #0f172a; border: none; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;"
+            onclick="this.setAttribute('disabled', 'true'); this.dataset.originalText = this.innerText; this.innerText = 'EXPORTING...'; setTimeout(() => { this.removeAttribute('disabled'); this.innerText = this.dataset.originalText; }, 2000)">
+        GENERATE REPORT
     </button>
-    
-    <div id="report-status" class="mono" style="font-size: 11px; text-align: center; color: #00e5ff;"></div>
+    <div id="report-status" class="mono" style="font-size: 11px; text-align: center; color: #fff700; font-weight: 600; margin-top: 8px;"></div>
 </div>
 
 {% else %}
+<span class="status-pill nominal" id="global-status" hx-swap-oob="true">● NOMINAL</span>
+
 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; gap: 12px;">
     <div class="engine-dot" style="background: #22c55e; scale: 1.5; box-shadow: 0 0 8px rgba(34,197,94,0.4);"></div>
     <div class="table-title" style="color: #ffffff;">All Systems Nominal</div>
     <p class="text-muted" style="font-size: 12px; max-width: 280px; margin: 0;">
         No packet loss anomalies or structural network faults detected for this target.
     </p>
+</div>
+
+<div class="export-card" style="margin-top: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="table-title" style="font-size: 11px; color: #9aa2b1;">ISP EVIDENCE EXPORT</div>
+        <p class="text-muted" style="font-size: 12px; line-height: 1.4; margin: 0;">
+            Compile a structured JSON report with all trace data, timestamps, and route analysis for ISP escalation.
+        </p>
+    </div>
+    <button class="btn-generate" 
+            hx-post="/report/snapshot" 
+            hx-target="#report-status-nominal" 
+            hx-swap="innerHTML"
+            style="padding: 8px 16px; background: #fff700; color: #0f172a; border: none; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;"
+            onclick="this.setAttribute('disabled', 'true'); this.dataset.originalText = this.innerText; this.innerText = 'EXPORTING...'; setTimeout(() => { this.removeAttribute('disabled'); this.innerText = this.dataset.originalText; }, 2000)">
+        GENERATE REPORT
+    </button>
+    <div id="report-status-nominal" class="mono" style="font-size: 11px; text-align: center; color: #fff700; font-weight: 600; margin-top: 8px;"></div>
 </div>
 {% endif %}
