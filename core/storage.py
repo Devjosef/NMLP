@@ -1,7 +1,12 @@
 import sqlite3
 import json
+from datetime import datetime
 
 DB_FILE = "nmpl_analytics.db"
+
+
+def _timestamp_value() -> str:
+    return datetime.now().strftime("%H:%M:%S")
 
 class StorageManager:
     def __init__(self):
@@ -39,9 +44,10 @@ class StorageManager:
         with sqlite3.connect(self.db_file) as conn:
             conn.execute("""
                 INSERT INTO metrics_timeline
-                (target, summary, status_flag, latency_ms, loss_pct, jitter_ms)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (timestamp, target, summary, status_flag, latency_ms, loss_pct, jitter_ms)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
+                _timestamp_value(),
                 target,
                 summary,
                 status_flag,
@@ -55,10 +61,11 @@ class StorageManager:
         with sqlite3.connect(self.db_file) as conn:
             conn.execute("""
                 INSERT INTO network_incidents
-                (target, structural_fault_summary, bottleneck_hop, bottleneck_host,
+                (timestamp, target, structural_fault_summary, bottleneck_hop, bottleneck_host,
                  bottleneck_loss_pct, raw_telemetry_json)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
+                _timestamp_value(),
                 target,
                 incident_payload.get("summary", ""),
                 bottleneck.get("hop"),
