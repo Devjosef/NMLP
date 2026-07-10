@@ -1,12 +1,17 @@
+#!/usr/bin/env python3
+
 import sqlite3
 import json
+import os
 from datetime import datetime
 
-DB_FILE = "nmpl_analytics.db"
+
+DB_FILE = os.getenv("NMPL_DB_FILE", "nmpl_analytics.db")
 
 
 def _timestamp_value() -> str:
     return datetime.now().strftime("%H:%M:%S")
+
 
 class StorageManager:
     def __init__(self):
@@ -39,6 +44,15 @@ class StorageManager:
                     resolved_flag INTEGER DEFAULT 0
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS active_targets (
+                    target TEXT PRIMARY KEY,
+                    registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+    def close(self):
+        pass
 
     def log_heartbeat(self, target, summary, status_flag, metrics):
         with sqlite3.connect(self.db_file) as conn:
@@ -110,3 +124,19 @@ class StorageManager:
                 ORDER BY timestamp DESC
                 LIMIT ?
             """, (limit,)).fetchall()
+
+    def register_active_target(self, target: str):
+        with sqlite3.connect(self.db_file) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO active_targets (target, registered_at)
+                VALUES (?, CURRENT_TIMESTAMP)
+            """, (target,))
+
+    def get_active_targets(self):
+        with sqlite3.connect(self.db_file) as conn:
+            return [
+                row[0]
+                for row in conn.execute("""
+                    SELECT target FROM active_targets
+                """).fetchall()
+            ]
