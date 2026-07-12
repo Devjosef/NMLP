@@ -1,16 +1,15 @@
-#!/usr/bin/env python3
-
 import sqlite3
 import json
 import os
 from datetime import datetime
 
-
 DB_FILE = os.getenv("NMPL_DB_FILE", "nmpl_analytics.db")
+EPHEMERAL_METRICS = os.getenv("NMPL_EPHEMERAL_METRICS", "true").lower() == "true"
+METRICS_RETENTION = int(os.getenv("NMPL_METRICS_RETENTION", "200"))
 
 
 def _timestamp_value() -> str:
-    return datetime.now().strftime("%H:%M:%S")
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 class StorageManager:
@@ -22,7 +21,7 @@ class StorageManager:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS metrics_timeline (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    timestamp DATETIME,
                     target TEXT,
                     summary TEXT,
                     status_flag TEXT,
@@ -31,112 +30,48 @@ class StorageManager:
                     jitter_ms REAL
                 )
             """)
+            
+            if EPHEMERAL_METRICS:
+                conn.execute("DROP TRIGGER IF EXISTS trim_metrics_timeline")
+                conn.execute(f"""
+                    CREATE TRIGGER trim_metrics_timeline
+                    AFTER INSERT ON metrics_timeline
+                    BEGIN
+                        DELETE FROM metrics_timeline
+                        WHERE id <= (
+                            SELECT id FROM metrics_timeline
+                            ORDER BY id DESC
+                            LIMIT 1 OFFSET {METRICS_RETENTION}
+                        );
+                    END
+                """)
+            else:
+                conn.execute("DROP TRIGGER IF EXISTS trim_metrics_timeline")
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS network_incidents (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    timestamp DATETIME,
                     target TEXT,
                     structural_fault_summary TEXT,
                     bottleneck_hop INTEGER,
                     bottleneck_host TEXT,
                     bottleneck_loss_pct REAL,
                     raw_telemetry_json TEXT,
-                    resolved_flag INTEGER DEFAULT 0
+                    resolved_flag INTEGER DEFAULT 0,
+                    resolved_at DATETIME,
+                    last_updated_at DATETIME
                 )
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS active_targets (
                     target TEXT PRIMARY KEY,
-                    registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    registered_at DATETIME
                 )
             """)
-
-    def close(self):
-        pass
-
-    def log_heartbeat(self, target, summary, status_flag, metrics):
-        with sqlite3.connect(self.db_file) as conn:
-            conn.execute("""
-                INSERT INTO metrics_timeline
-                (timestamp, target, summary, status_flag, latency_ms, loss_pct, jitter_ms)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                _timestamp_value(),
-                target,
-                summary,
-                status_flag,
-                metrics["latency_ms"],
-                metrics["loss_pct"],
-                metrics["jitter_ms"]
-            ))
-
-    def log_incident(self, target, incident_payload):
-        bottleneck = incident_payload.get("bottleneck", {}) or {}
-        with sqlite3.connect(self.db_file) as conn:
-            conn.execute("""
-                INSERT INTO network_incidents
-                (timestamp, target, structural_fault_summary, bottleneck_hop, bottleneck_host,
-                 bottleneck_loss_pct, raw_telemetry_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                _timestamp_value(),
-                target,
-                incident_payload.get("summary", ""),
-                bottleneck.get("hop"),
-                bottleneck.get("host"),
-                bottleneck.get("loss"),
-                json.dumps(incident_payload, indent=2)
-            ))
-
-    def get_incident(self, incident_id):
-        with sqlite3.connect(self.db_file) as conn:
-            return conn.execute("""
-                SELECT id, timestamp, target, structural_fault_summary,
-                       bottleneck_hop, bottleneck_host, bottleneck_loss_pct, raw_telemetry_json
-                FROM network_incidents
-                WHERE id = ?
-            """, (incident_id,)).fetchone()
-
-    def get_metrics_timeline(self, target=None, limit=100):
-        with sqlite3.connect(self.db_file) as conn:
-            if target:
-                return conn.execute("""
-                    SELECT id, timestamp, target, summary, status_flag, latency_ms, loss_pct, jitter_ms
-                    FROM metrics_timeline
-                    WHERE target = ?
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                """, (target, limit)).fetchall()
-
-            return conn.execute("""
-                SELECT id, timestamp, target, summary, status_flag, latency_ms, loss_pct, jitter_ms
-                FROM metrics_timeline
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (limit,)).fetchall()
-
-    def get_all_incidents(self, limit=100):
-        with sqlite3.connect(self.db_file) as conn:
-            return conn.execute("""
-                SELECT id, timestamp, target, structural_fault_summary,
-                       bottleneck_hop, bottleneck_host, bottleneck_loss_pct, raw_telemetry_json
-                FROM network_incidents
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """, (limit,)).fetchall()
-
-    def register_active_target(self, target: str):
-        with sqlite3.connect(self.db_file) as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO active_targets (target, registered_at)
-                VALUES (?, CURRENT_TIMESTAMP)
-            """, (target,))
-
-    def get_active_targets(self):
-        with sqlite3.connect(self.db_file) as conn:
-            return [
-                row[0]
-                for row in conn.execute("""
-                    SELECT target FROM active_targets
-                """).fetchall()
-            ]
+            
+            existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(network_incidents)")}
+            if "resolved_at" not in existing_cols:
+                conn.execute("ALTER TABLE network_incidents ADD COLUMN resolved_at DATETIME")
+            if "last_updated_at" not in existing_cols:
+                conn.execute("ALTER TABLE network_incidents ADD COLUMN last_updated_at DATETIME")
