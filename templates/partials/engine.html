@@ -1,51 +1,55 @@
 {% if incident %}
-<span class="status-pill failure" id="global-status" hx-swap-oob="true">● FAILURE</span>
+<div id="incident-engine-content">
+    <span class="status-pill failure" id="global-status" hx-swap-oob="true">● FAILURE</span>
 
-<div class="engine-header">
-    <div class="engine-title" 
-         hx-get="/partials/engine" 
-         hx-include="#target-selector" 
-         hx-target="#incident-engine-panel" 
-         hx-swap="innerHTML" 
-         style="cursor: pointer;" 
-         title="Reset to live view">
-        <span class="engine-dot" style="background: #ef4444;"></span> INCIDENT ENGINE
+    <div class="engine-header">
+        <div class="engine-title" 
+             hx-get="/partials/engine" 
+             hx-include="#target-selector" 
+             hx-target="#incident-engine-panel" 
+             hx-swap="innerHTML" 
+             style="cursor: pointer;" 
+             title="Reset to live view">
+            <span class="engine-dot" style="background: #ef4444;"></span> INCIDENT ENGINE
+        </div>
+        {% set incident_ts = incident[1] %}
+        <div class="mono text-muted" style="font-size: 11px; display: flex; align-items: center; gap: 8px;">
+            <span>INC-{{ "%03d"|format(incident[0]) }} • {{ incident_ts.split(' ')[1] if incident_ts and ' ' in incident_ts else incident_ts }}</span>
+            {% if incident[8] %}
+            <span class="meta-tag" style="background:#22c55e; color:#0c0d12; font-weight:700; padding:2px 6px; border-radius:3px; font-size:9px;">RESOLVED</span>
+            {% endif %}
+        </div>
     </div>
-    {% set incident_ts = incident[1] %}
-    <div class="mono text-muted" style="font-size: 11px;">INC-{{ "%03d"|format(incident[0]) }} • {{ incident_ts.split(' ')[1] if incident_ts and ' ' in incident_ts else incident_ts }}</div>
-</div>
 
-<div class="summary-block">
-    {{ incident[3] }}
-</div>
+    <div class="summary-block">
+        {{ incident[3] }}
+    </div>
 
-<div class="route-path-box" style="margin-top: 16px;">
-    <div class="table-title" style="font-size: 11px; margin-bottom: 12px; color: #9aa2b1;">ROUTE PATH — 6 HOPS TRACED</div>
-    <div hx-get="/partials/route/{{ incident[0] }}" 
+    <div class="route-path-box" style="margin-top: 16px;" 
+         hx-get="/partials/route/{{ incident[0] }}" 
          hx-trigger="load" 
          hx-swap="outerHTML">
          <div class="text-muted mono" style="font-size: 12px; padding: 10px; text-align: center;">Loading network trace nodes...</div>
     </div>
-</div>
 
-<div class="export-card" style="margin-top: 16px;">
-    <div style="display: flex; flex-direction: column; gap: 4px;">
-        <div class="table-title" style="font-size: 11px; color: #9aa2b1;">ISP EVIDENCE EXPORT</div>
-        <p class="text-muted" style="font-size: 12px; line-height: 1.4; margin: 0;">
-            Compile a structured JSON report with all trace data, timestamps, and route analysis for ISP escalation.
-        </p>
+    <div class="export-card" style="margin-top: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div class="table-title" style="font-size: 11px; color: #9aa2b1;">ISP EVIDENCE EXPORT</div>
+            <p class="text-muted" style="font-size: 12px; line-height: 1.4; margin: 0;">
+                Compile a structured JSON report with all trace data, timestamps, and route analysis for ISP escalation.
+            </p>
+        </div>
+        <button class="btn-generate" 
+                hx-post="/report/{{ incident[0] }}" 
+                hx-target="#report-status" 
+                hx-swap="innerHTML"
+                style="padding: 8px 16px; background: #fff700; color: #0f172a; border: none; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;"
+                onclick="this.setAttribute('disabled', 'true'); this.dataset.originalText = this.innerText; this.innerText = 'EXPORTING...'; setTimeout(() => { this.removeAttribute('disabled'); this.innerText = this.dataset.originalText; }, 2000)">
+            GENERATE REPORT
+        </button>
+        <div id="report-status" class="mono" style="font-size: 11px; text-align: center; color: #fff700; font-weight: 600; margin-top: 8px;"></div>
     </div>
-    <button class="btn-generate" 
-            hx-post="/report/{{ incident[0] }}" 
-            hx-target="#report-status" 
-            hx-swap="innerHTML"
-            style="padding: 8px 16px; background: #fff700; color: #0f172a; border: none; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;"
-            onclick="this.setAttribute('disabled', 'true'); this.dataset.originalText = this.innerText; this.innerText = 'EXPORTING...'; setTimeout(() => { this.removeAttribute('disabled'); this.innerText = this.dataset.originalText; }, 2000)">
-        GENERATE REPORT
-    </button>
-    <div id="report-status" class="mono" style="font-size: 11px; text-align: center; color: #fff700; font-weight: 600; margin-top: 8px;"></div>
 </div>
-
 {% else %}
 <span class="status-pill nominal" id="global-status" hx-swap-oob="true">● NOMINAL</span>
 

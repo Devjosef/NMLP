@@ -1,31 +1,23 @@
 {% for row in rows %}
 <tr class="{% if row[4] == 'ALERT' %}active-incident-row{% else %}normal-row{% endif %}" 
     style="cursor: pointer;"
-    {% if row[4] == 'ALERT' %}
-        hx-get="/partials/engine?incident_id={{ row[0] }}"
-    {% else %}
-        hx-get="/partials/engine?target={{ row[2] }}&snapshot={{ row[0] }}"
-    {% endif %}
-    hx-target="#incident-engine-panel"
-    hx-swap="innerHTML">
+    hx-get="/partials/metrics?target={{ row[2] }}"
+    hx-target="#timeline-body"
+    hx-swap="innerHTML"
+    hx-push-url="false"
+    hx-on::after-request="document.getElementById('target-selector').value = '{{ row[2] }}'; htmx.ajax('GET', '/partials/engine', {target: '#incident-engine-panel', swap: 'innerHTML', values: {target: '{{ row[2] }}'}})">
     
     {% set ts = row[1] %}
     <td class="mono text-muted">{{ ts.split(' ')[1] if ts and ' ' in ts else ts }}</td>
     
-    <td hx-get="/partials/metrics?target={{ row[2] }}"
-        hx-target="#timeline-body"
-        hx-swap="innerHTML"
-        hx-push-url="false"
-        hx-on::after-request="document.getElementById('target-selector').value = '{{ row[2] }}'; htmx.ajax('GET', '/partials/engine', {target: '#incident-engine-panel', swap: 'innerHTML', values: {target: '{{ row[2] }}'}})"
-        style="position: relative; z-index: 3;">
+    <td style="position: relative; z-index: 3;">
         <span class="target-link" style="font-weight: 600; color: #ffffff; display: block;">{{ row[2] }}</span>
         <span class="text-muted" style="font-size: 11px; display: block;">{{ row[3] if row[3] else 'Unknown Target' }}</span>
     </td>
     
-    <td>
+    <td style="white-space: nowrap;">
         {% if row[4] == 'ALERT' %}
             <span class="badge alert">ALERT</span>
-            <span class="text-muted mono" style="font-size: 11px; margin-left: 4px;">INC-0{{ row[0] }}</span>
         {% else %}
             <span class="badge ok">OK</span>
         {% endif %}
