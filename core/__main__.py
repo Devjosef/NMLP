@@ -28,6 +28,7 @@ def main_with_result(args_list=None):
         "hops": [],
         "analyzer": None,
         "csv": "",
+        "is_alert": False,
         "metrics": {"loss_pct": 0.0, "latency_ms": 0.0, "jitter_ms": 0.0}
     }
     
@@ -56,6 +57,8 @@ def main_with_result(args_list=None):
             result["summary"] = "\n".join(summary_lines)
             result["metrics"]["loss_pct"] = analysis["total_loss"]
             result["metrics"]["latency_ms"] = analysis["average_latency"]
+            # MTR path has no Detector instance — treat >10% on any hop as alert-worthy
+            result["is_alert"] = any(hop["loss"] > 10 for hop in hops)
             
             if args.csv:
                 with open(args.csv, "w", newline="") as f:
@@ -76,17 +79,15 @@ def main_with_result(args_list=None):
         if args.watch:
             d.probe(args.target)
             result["summary"] = d.status()
-            recent_losses = list(d.alert_losses)
-            result["metrics"]["loss_pct"] = recent_losses[-1] * 100.0 if recent_losses else 0.0
+            result["metrics"]["loss_pct"] = d.current_loss_pct()
+            result["is_alert"] = d.is_alert
         else:
             for _ in range(30):
                 d.probe(args.target)
             result["summary"] = d.status()
-            if d.baseline_established and d.baseline is not None:
-                result["metrics"]["loss_pct"] = d.baseline * 100.0
-            else:
-                recent_losses = list(d.alert_losses)
-                result["metrics"]["loss_pct"] = (sum(recent_losses) / len(recent_losses) * 100.0) if recent_losses else 0.0
+            result["metrics"]["loss_pct"] = d.current_loss_pct()
+            result["is_alert"] = d.is_alert
+            result["stats"] = d.get_stats()
                 
     return result
 
