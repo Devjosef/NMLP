@@ -11,8 +11,24 @@
     <td class="mono text-muted">{{ ts.split(' ')[1] if ts and ' ' in ts else ts }}</td>
     
     <td style="position: relative; z-index: 3;">
-        <span class="target-link" style="font-weight: 600; color: #ffffff; display: block;">{{ row[2] }}</span>
-        <span class="text-muted" style="font-size: 11px; display: block;">{{ row[3] if row[3] else 'Unknown Target' }}</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="min-width: 0;">
+                <span class="target-link" style="font-weight: 600; color: #ffffff; display: block;">{{ row[2] }}</span>
+                <span class="text-muted" style="font-size: 11px; display: block;">{{ row[3] if row[3] else 'Unknown Target' }}</span>
+            </div>
+            <button
+                title="Stop monitoring {{ row[2] }}"
+                hx-delete="/targets/{{ row[2] }}"
+                hx-target="#timeline-body"
+                hx-swap="innerHTML"
+                hx-include="#target-selector"
+                hx-confirm="Stop monitoring {{ row[2] }}? Past history stays in the timeline, but no new probes will run."
+                onclick="event.stopPropagation();"
+                hx-on::after-request="if(document.getElementById('target-selector').value === '{{ row[2] }}') { document.getElementById('target-selector').value = ''; } htmx.ajax('GET', '/partials/metrics', {target: '#timeline-body', swap: 'innerHTML'}); htmx.ajax('GET', '/partials/engine', {target: '#incident-engine-panel', swap: 'innerHTML'});"
+                style="background: transparent; border: 1px solid #2a2f45; color: #6c757d; border-radius: 4px; width: 22px; height: 22px; flex-shrink: 0; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">
+                ✕
+            </button>
+        </div>
     </td>
     
     <td style="white-space: nowrap;">
@@ -23,7 +39,7 @@
         {% endif %}
     </td>
     
-    <td>
+   <td>
         <div class="mini-bar-wrapper">
             {% if row[4] == 'ALERT' %}
                 <div class="mini-bar-fill alert" style="width: 75%;"></div>
@@ -31,17 +47,17 @@
                 <div class="mini-bar-fill ok" style="width: 25%;"></div>
             {% endif %}
         </div>
-        <span class="mono" style="color: #ffffff;">{{ row[5] if row[5] is not none else 0 }}<span class="text-muted" style="font-size: 10px; margin-left: 1px;">ms</span></span>
+        <span class="mono" style="color: #ffffff;">{{ "%.1f"|format(row[5]) if row[5] is not none else "0.0" }}<span class="text-muted" style="font-size: 10px; margin-left: 1px;">ms</span></span>
     </td>
     
     <td>
         <span class="mono {% if row[6] and row[6] > 0 %}text-red{% else %}text-white{% endif %}" style="font-weight: 600;">
-            {{ row[6] if row[6] is not none else 0.0 }}<span class="text-muted" style="font-size: 10px; margin-left: 1px; font-weight: 400;">%</span>
+            {{ "%.1f"|format(row[6]) if row[6] is not none else "0.0" }}<span class="text-muted" style="font-size: 10px; margin-left: 1px; font-weight: 400;">%</span>
         </span>
     </td>
     
     <td>
-        <span class="mono" style="color: #ffffff;">{{ row[7] if row[7] is not none else 0 }}<span class="text-muted" style="font-size: 10px; margin-left: 1px;">ms</span></span>
+        <span class="mono" style="color: #ffffff;">{{ "%.1f"|format(row[7]) if row[7] is not none else "0.0" }}<span class="text-muted" style="font-size: 10px; margin-left: 1px;">ms</span></span>
     </td>
 </tr>
 {% else %}
