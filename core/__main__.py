@@ -57,7 +57,6 @@ def main_with_result(args_list=None):
             result["summary"] = "\n".join(summary_lines)
             result["metrics"]["loss_pct"] = analysis["total_loss"]
             result["metrics"]["latency_ms"] = analysis["average_latency"]
-            # MTR path has no Detector instance — treat >10% on any hop as alert-worthy
             result["is_alert"] = any(hop["loss"] > 10 for hop in hops)
             
             if args.csv:
@@ -80,12 +79,14 @@ def main_with_result(args_list=None):
             d.probe(args.target)
             result["summary"] = d.status()
             result["metrics"]["loss_pct"] = d.current_loss_pct()
+            result["metrics"]["latency_ms"] = d.current_latency_ms()
             result["is_alert"] = d.is_alert
         else:
             for _ in range(30):
                 d.probe(args.target)
             result["summary"] = d.status()
             result["metrics"]["loss_pct"] = d.current_loss_pct()
+            result["metrics"]["latency_ms"] = d.current_latency_ms()
             result["is_alert"] = d.is_alert
             result["stats"] = d.get_stats()
                 
@@ -96,7 +97,7 @@ def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--interval", type=float, default=3.0)
-    args, unknown = parser.parse_known_args(args_list)
+    args, _ = parser.parse_known_args(args_list)  # Replaced unknown with _
     
     if args.watch and not any(arg in args_list for arg in ["--mtr", "--once"]):
         parser_full = argparse.ArgumentParser()
