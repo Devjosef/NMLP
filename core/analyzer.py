@@ -23,6 +23,7 @@ def analyze_path(hops: List[Dict]) -> Dict:
         }
 
     try:
+        # Compute basic statistics about the path based on hop data
         analysis = {
             "total_hops": len(hops),
             "total_loss": sum(hop["loss"] for hop in hops) / len(hops),

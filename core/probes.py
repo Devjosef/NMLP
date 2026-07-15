@@ -24,21 +24,28 @@ def icmp_probe(target, packet_size=64, timeout=1):
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 2)
     except subprocess.TimeoutExpired:
-        return False, 0.0
+        return False, None
     except FileNotFoundError:
         logger.error("'ping' binary not found on this system.")
-        return False, 0.0
+        return False, None
 
     success = (result.returncode == 0)
-    latency_ms = 0.0
-    if success:
-        match = _LATENCY_RE.search(result.stdout)
-        if match:
-            try:
-                latency_ms = float(match.group(1))
-            except ValueError:
-                latency_ms = 0.0
-    return success, latency_ms
+    if not success:
+        return False, None
+
+    match = _LATENCY_RE.search(result.stdout)
+    if not match:
+        logger.warning(
+            f"ping succeeded (rc=0) but latency could not be parsed from output — "
+            f"possible format drift. First 200 chars: {result.stdout[:200]!r}"
+        )
+        return True, None
+
+    try:
+        return True, float(match.group(1))
+    except ValueError:
+        logger.warning(f"Matched latency token but failed to parse as float: {match.group(1)!r}")
+        return True, None
 
 
 def udp_probe(target, timeout=1, jitter=True):

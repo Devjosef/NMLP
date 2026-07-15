@@ -23,7 +23,7 @@ class Detector:
         self.icmp_loss_history = deque(maxlen=baseline_window)
         self.udp_loss_history = deque(maxlen=baseline_window)
         self.icmp_rate_limit_history = deque(maxlen=recent_window)
-        self.latency_history = deque(maxlen=recent_window)  # ms, successful probes only
+        self.latency_history = deque(maxlen=recent_window)  # ms, successful + parseable probes only
 
         self.currently_alerting = False
         self.udp_state = "normal"
@@ -42,7 +42,7 @@ class Detector:
         self.icmp_failures += (1 - icmp_success)
         self.icmp_loss_history.append(1 - icmp_success)
 
-        if icmp_success:
+        if icmp_success and icmp_small_latency is not None and icmp_large_latency is not None:
             self.latency_history.append((icmp_small_latency + icmp_large_latency) / 2.0)
 
         udp_ok = udp_probe(target)
