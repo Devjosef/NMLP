@@ -20,9 +20,33 @@
         .table-container { background: #11131c; border: 1px solid #1e2235; border-radius: 6px; overflow: hidden; }
         .table-header-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #1e2235; background: #151824; }
         .table-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #9aa2b1; }
+        
+        .timeline-scroll-wrapper { 
+            max-height: 640px; 
+            overflow-y: auto; 
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: #1e2235 #11131c;
+        }
+        
+        .timeline-scroll-wrapper::-webkit-scrollbar {
+            width: 8px;
+        }
+        .timeline-scroll-wrapper::-webkit-scrollbar-track {
+            background: #11131c;
+        }
+        .timeline-scroll-wrapper::-webkit-scrollbar-thumb {
+            background-color: #1e2235;
+            border-radius: 4px;
+            border: 2px solid #11131c;
+        }
+        .timeline-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+            background-color: #00e5ff;
+        }
+
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid #161926; font-size: 13px; }
-        th { background-color: #151824; color: #6c757d; font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+        th { background-color: #151824; color: #6c757d; font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 4; }
         tr.active-incident-row { background: rgba(239, 68, 68, 0.04); }
         tr.active-incident-row:hover { background: rgba(239, 68, 68, 0.08); }
         tr.normal-row:hover { background: #181b28; }
@@ -73,6 +97,7 @@
                     <span class="brand">((•)) NMPL</span>
                     <span class="text-muted" style="font-size: 11px;">v1.0.0</span>
                     <span class="status-pill nominal" id="global-status">● NOMINAL</span>
+                    <a href="/archive" style="color: #9aa2b1; text-decoration: none; font-size: 11px; font-family: ui-monospace, SFMono-Regular, monospace; border: 1px solid #1e2235; border-radius: 4px; padding: 4px 10px; margin-left: 8px;">ARCHIVE</a>
                 </div>
                 
                 <div class="control-toolbar" style="display: flex; align-items: center; gap: 12px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px;">
@@ -108,31 +133,33 @@
             <div class="table-container">
                 <div class="table-header-bar">
                     <div class="table-title">Metrics Timeline</div>
-                    <div class="text-muted mono" style="font-size: 11px;">40 ENTRIES</div>
+                    <div class="text-muted mono" style="font-size: 11px;">LIVE (ROLLING)</div>
                 </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Target</th>
-                            <th>Status</th>
-                            <th>Latency</th>
-                            <th>Loss</th>
-                            <th>Jitter</th>
-                        </tr>
-                    </thead>
-                    <tbody id="timeline-body" 
-                           hx-get="/partials/metrics" 
-                           hx-trigger="load, every 5s" 
-                           hx-include="#target-selector"
-                           hx-swap="innerHTML">
-                        <tr>
-                            <td colspan="6" style="text-align: center; padding: 30px; color: #6c757d;">
-                                Initializing timeline matrix logs...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="timeline-scroll-wrapper" id="timeline-scroll-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Target</th>
+                                <th>Status</th>
+                                <th>Latency</th>
+                                <th>Loss</th>
+                                <th>Jitter</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timeline-body" 
+                               hx-get="/partials/metrics" 
+                               hx-trigger="load, every 5s" 
+                               hx-include="#target-selector"
+                               hx-swap="innerHTML settle:0s">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 30px; color: #6c757d;">
+                                    Initializing timeline matrix logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -147,5 +174,37 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.body.addEventListener('htmx:beforeSwap', (evt) => {
+            if (evt.detail.target && evt.detail.target.id === 'timeline-body') {
+                const wrapper = document.getElementById('timeline-scroll-wrapper');
+                if (wrapper) {
+                    wrapper.dataset.savedScroll = wrapper.scrollTop;
+                }
+            }
+
+            // Our 429 rate-limit responses carry a real HTML fragment meant
+            // to be swapped in, not treated as a dead error. htmx's default
+            // is to refuse to swap anything with a 4xx/5xx status — override
+            // that specifically for 429s so the fragment actually renders.
+            if (evt.detail.xhr && evt.detail.xhr.status === 429) {
+                evt.detail.shouldSwap = true;
+                evt.detail.isError = false;
+            }
+        });
+
+        document.body.addEventListener('htmx:afterSwap', (evt) => {
+            if (evt.detail.target && evt.detail.target.id === 'timeline-body') {
+                const wrapper = document.getElementById('timeline-scroll-wrapper');
+                if (wrapper && wrapper.dataset.savedScroll !== undefined) {
+                    const originalBehavior = wrapper.style.scrollBehavior;
+                    wrapper.style.scrollBehavior = 'auto';
+                    wrapper.scrollTop = parseInt(wrapper.dataset.savedScroll, 10);
+                    wrapper.style.scrollBehavior = originalBehavior;
+                }
+            }
+        });
+    </script>
 </body>
 </html>
