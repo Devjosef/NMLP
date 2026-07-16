@@ -6,7 +6,14 @@ build-backend = "setuptools.build_meta"
 name = "nmpl"
 version = "0.2.1"
 description = "No More Packet Loss"
-dependencies = []
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "pydantic",
+    "python-dotenv",
+    "slowapi",
+]
 
 [project.scripts]
 nmpl = "core.__main__:main"
