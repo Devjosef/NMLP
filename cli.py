@@ -192,7 +192,11 @@ def run_daemon(initial_targets, interval=3.0, base_args=None):
                 targets = db.get_active_targets()
 
                 if targets:
-                    list(executor.map(probe_worker, targets))
+                    try:
+                        # Wrap collection to protect the loop from deferred task exceptions
+                        list(executor.map(probe_worker, targets))
+                    except Exception as loop_exc:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Daemon cycle error: {loop_exc}")
 
                 time.sleep(max(0.1, interval - (time.time() - loop_start)))
     except KeyboardInterrupt:

@@ -108,10 +108,10 @@ def _evaluate_and_route_incident_sync(target):
 
         open_incident = db.get_open_incident(target)
         if open_incident:
-            db.update_incident(open_incident[0], incident_payload)
+            db.update_incident(open_incident[0], incident_payload, source="api")
             logger.info(f"Updated open incident #{open_incident[0]} with fresh evidence.")
         else:
-            new_id = db.log_incident(target, incident_payload)
+            new_id = db.log_incident(target, incident_payload, source="api")
             logger.info(f"Opened new incident #{new_id}.")
     finally:
         with _active_snapshots_lock:
@@ -139,7 +139,7 @@ def _probe_and_log_sync(target):
             "jitter_ms": d.current_jitter_ms()
         }
 
-        db.log_heartbeat(target, summary, status_flag, metrics)
+        db.log_heartbeat(target, summary, status_flag, metrics, source="api")
         logger.info(f"[{target}] {status_flag}: {summary}")
 
         if is_alert:
@@ -204,12 +204,6 @@ async def _startup_scan_loop():
         except Exception as e:
             logger.error(f"Error scanning active targets: {e}")
 
-        # Self-healing reconciliation: any open incident for a target that
-        # isn't in active_targets anymore is orphaned — the delete endpoint
-        # resolves incidents on removal, but this catches the cases that
-        # path can't: a crash between removal and resolution, manual DB
-        # edits, or a target that vanished some other way. Runs on the same
-        # 5s cadence as the worker scan rather than a separate timer.
         try:
             open_incidents = db.get_all_incidents(limit=200, open_only=True)
             for inc in open_incidents:
@@ -340,6 +334,68 @@ def dashboard(request: Request):
         raise HTTPException(status_code=500, detail="Template render error")
 
 
+@app.get("/archive", response_class=HTMLResponse)
+def archive_page(request: Request, status: Optional[str] = None, target: Optional[str] = None):
+    try:
+        rows = db.get_all_incidents(limit=500, open_only=False)
+    except Exception as e:
+        logger.error(f"Failed to fetch incident archive: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+    status_filter = (status or "all").lower()
+    target_filter = (target or "").strip().lower()
+
+    def _matches(row):
+        resolved = bool(row[8]) if len(row) > 8 else False
+        if status_filter == "open" and resolved:
+            return False
+        if status_filter == "resolved" and not resolved:
+            return False
+        if target_filter and target_filter not in (row[2] or "").lower():
+            return False
+        return True
+
+    filtered = [r for r in rows if _matches(r)]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="archive.html",
+        context={
+            "incidents": filtered,
+            "status_filter": status_filter,
+            "target_filter": target or "",
+            "total_count": len(rows),
+            "filtered_count": len(filtered),
+        }
+    )
+
+
+@app.delete("/incident/{incident_id}")
+def delete_incident(request: Request, incident_id: int):
+    try:
+        row = db.get_incident(incident_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Incident not found")
+
+        resolved = bool(row[8]) if len(row) > 8 else False
+        if not resolved:
+            raise HTTPException(status_code=400, detail="Cannot delete an open incident — resolve it first")
+
+        deleted = db.delete_incident(incident_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Incident not found")
+
+        client_host = request.client.host if request.client else "unknown"
+        logger.info(f"Incident #{incident_id} permanently deleted (requested by {client_host}).")
+        return Response(status_code=200)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete incident {incident_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+
 @app.get("/partials/metrics", response_class=HTMLResponse)
 @limiter.limit(REGISTRATION_RATE_LIMIT)
 def partial_metrics(request: Request, target: Optional[str] = None, limit: int = 40):
@@ -391,11 +447,6 @@ def partial_engine(request: Request, target: Optional[str] = None, incident_id: 
             if filtered:
                 incident = filtered[0]
         else:
-            # No target pinned — only surface an incident if it belongs to
-            # a target we're still actively watching. An open incident for
-            # a removed/orphaned target shouldn't dominate the default view
-            # (the _startup_scan_loop reconciliation sweep should keep this
-            # case rare, but this is the second line of defense).
             active = set(db.get_active_targets())
             incidents = db.get_all_incidents(limit=100, open_only=True)
             live_incidents = [inc for inc in incidents if inc[2] in active]
@@ -429,6 +480,17 @@ def partial_route(request: Request, incident_id: int):
     analysis = raw.get("analyzer", {}) or raw.get("analysis", {})
 
     return templates.TemplateResponse(request=request, name="partials/route.html", context={"hops": hops, "analysis": analysis})
+
+
+@app.delete("/targets")
+@app.delete("/targets/")
+@limiter.limit(DELETE_RATE_LIMIT)
+async def delete_target_empty(request: Request):
+    """
+    Catch-all fallback route to intercept empty, trailing, or malformed target deletions
+    resulting from HTTP parameters parsing queries (such as /targets/??? -> /targets/?).
+    """
+    raise HTTPException(status_code=400, detail="Invalid target")
 
 
 @app.delete("/targets/{target}")
