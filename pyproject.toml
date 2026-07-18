@@ -13,6 +13,7 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "slowapi",
+    "pytest"
 ]
 
 [project.scripts]
