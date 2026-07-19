@@ -40,7 +40,8 @@ def main_with_result(args_list=None):
             summary_lines = [f"Traceroute to {args.target}:"]
             for hop in hops:
                 status = "BAD" if hop["loss"] > 10 else "OK"
-                summary_lines.append(f"{status} Hop {hop['hop']}: {hop['loss']:.1f}% -> {hop['host']} (avg: {hop['avg']} ms)")
+                avg_display = f"{hop['avg']:.1f} ms" if hop['avg'] is not None else "N/A"
+                summary_lines.append(f"{status} Hop {hop['hop']}: {hop['loss']:.1f}% -> {hop['host']} (avg: {avg_display})")
             
             analysis = analyze_path(hops)
             result["analyzer"] = analysis
@@ -51,7 +52,12 @@ def main_with_result(args_list=None):
             summary_lines.append(f"Total Loss: {analysis['total_loss']:.1f}%")
             summary_lines.append(f"Average Latency: {analysis['average_latency']:.1f} ms")
             if analysis["bottleneck"]:
-                summary_lines.append(f"Bottleneck: Hop {analysis['bottleneck']['hop']} ({analysis['bottleneck']['host']}) with {analysis['bottleneck']['loss']:.1f}% loss")
+                bottleneck_avg = analysis['bottleneck'].get('avg_latency')
+                bottleneck_avg_display = f"{bottleneck_avg:.1f}" if bottleneck_avg is not None else "N/A"
+                summary_lines.append(
+                    f"Bottleneck: Hop {analysis['bottleneck']['hop']} ({analysis['bottleneck']['host']}) "
+                    f"with {analysis['bottleneck']['loss']:.1f}% loss"
+                )
             summary_lines.append(f"Next: {analysis['suggestion']}")
             
             result["summary"] = "\n".join(summary_lines)
@@ -97,7 +103,7 @@ def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--interval", type=float, default=3.0)
-    args, _ = parser.parse_known_args(args_list)  # Replaced unknown with _
+    args, _ = parser.parse_known_args(args_list)
     
     if args.watch and not any(arg in args_list for arg in ["--mtr", "--once"]):
         parser_full = argparse.ArgumentParser()

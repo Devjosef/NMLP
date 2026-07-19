@@ -15,7 +15,7 @@ ELEVATED_LOSS_THRESHOLD = 5.0
 
 def analyze_path(hops: List[Dict]) -> Dict:
     if not hops:
-        logger.warning("analyze_path called with no hops data — nothing to analyze.")
+        logger.warning("analyze_path called with no hops data.")
         return {
             "status": "error",
             "message": "No hops data to analyze",
@@ -23,12 +23,14 @@ def analyze_path(hops: List[Dict]) -> Dict:
         }
 
     try:
-        # Compute basic statistics about the path based on hop data
+        valid_avgs = [hop["avg"] for hop in hops if hop.get("avg") is not None]
+        valid_worsts = [hop["worst"] for hop in hops if hop.get("worst") is not None]
+
         analysis = {
             "total_hops": len(hops),
             "total_loss": sum(hop["loss"] for hop in hops) / len(hops),
-            "average_latency": sum(hop["avg"] for hop in hops) / len(hops),
-            "worst_latency": max(hop["worst"] for hop in hops),
+            "average_latency": sum(valid_avgs) / len(valid_avgs) if valid_avgs else 0.0,
+            "worst_latency": max(valid_worsts) if valid_worsts else 0.0,
             "bottleneck": None,
             "forwardloss_inherited": False,
             "likely_rate_limited": False,
@@ -36,15 +38,48 @@ def analyze_path(hops: List[Dict]) -> Dict:
             "suggestion": ""
         }
 
-        bottleneck = max(hops, key=lambda x: x["loss"])
+        chosen_bottleneck = None
+        total_hops = len(hops)
+
+        for i, current_hop in enumerate(hops):
+            current_loss = current_hop.get("loss", 0.0)
+            current_host = current_hop.get("host", "???")
+
+            if current_loss > ELEVATED_LOSS_THRESHOLD:
+                sustained_loss = False
+                lookahead_valid_hops = 0
+
+                for next_idx in range(i + 1, min(i + 4, total_hops)):
+                    next_hop = hops[next_idx]
+                    if next_hop.get("host") == "???":
+                        continue
+                    
+                    lookahead_valid_hops += 1
+                    if next_hop.get("loss", 0.0) >= (current_loss * 0.5):
+                        sustained_loss = True
+                        break
+
+                if current_host == "???" and not sustained_loss and lookahead_valid_hops > 0:
+                    continue
+
+                chosen_bottleneck = current_hop
+                break
+
+        if not chosen_bottleneck:
+            if hops[-1].get("loss", 0.0) > 0.0:
+                chosen_bottleneck = hops[-1]
+            else:
+                chosen_bottleneck = max(hops, key=lambda x: x["loss"])
+
         analysis["bottleneck"] = {
-            "hop": bottleneck["hop"],
-            "host": bottleneck["host"],
-            "loss": bottleneck["loss"],
-            "avg_latency": bottleneck["avg"]
+            "hop": chosen_bottleneck["hop"],
+            "host": chosen_bottleneck["host"],
+            "loss": chosen_bottleneck["loss"],
+            "avg_latency": chosen_bottleneck.get("avg")
         }
+
     except KeyError as e:
-        logger.error(f"Malformed hop data passed to analyze_path — missing key: {e}")
+        logger.error(f"Malformed hop data: missing key {e}")
         return {
             "status": "error",
             "message": f"Malformed hop data: missing key {e}",
@@ -53,7 +88,7 @@ def analyze_path(hops: List[Dict]) -> Dict:
 
     bottleneck_idx = None
     for i, hop in enumerate(hops):
-        if hop["hop"] == bottleneck["hop"]:
+        if hop["hop"] == analysis["bottleneck"]["hop"]:
             bottleneck_idx = i
             break
 
@@ -68,29 +103,27 @@ def analyze_path(hops: List[Dict]) -> Dict:
 
         if total_hops_after > 0 and (loss_after_bottleneck / total_hops_after) > 0.5:
             analysis["forwardloss_inherited"] = True
-            logger.info(
-                f"Forward-loss inheritance detected past hop {bottleneck['hop']} "
-                f"({bottleneck['host']}) — loss persists downstream."
-            )
+            logger.info(f"Forward-loss inheritance at hop {analysis['bottleneck']['hop']}")
 
     final_hop = hops[-1]
-    if bottleneck["loss"] > CRITICAL_LOSS_THRESHOLD and final_hop["loss"] < ELEVATED_LOSS_THRESHOLD:
+    if analysis["bottleneck"]["loss"] > CRITICAL_LOSS_THRESHOLD and final_hop["loss"] < ELEVATED_LOSS_THRESHOLD:
         analysis["likely_rate_limited"] = True
 
-    analysis["elevated"] = ELEVATED_LOSS_THRESHOLD < bottleneck["loss"] <= CRITICAL_LOSS_THRESHOLD
+    analysis["elevated"] = ELEVATED_LOSS_THRESHOLD < analysis["bottleneck"]["loss"] <= CRITICAL_LOSS_THRESHOLD
 
+    b_data = analysis["bottleneck"]
     if analysis["likely_rate_limited"]:
-        analysis["suggestion"] = SUGGESTION_RATE_LIMITED.format(hop=bottleneck["hop"], host=bottleneck["host"])
-        logger.info(f"Hop {bottleneck['hop']} ({bottleneck['host']}) classified as ICMP rate-limited, not a real fault.")
-    elif bottleneck["loss"] > CRITICAL_LOSS_THRESHOLD and analysis["forwardloss_inherited"]:
-        analysis["suggestion"] = SUGGESTION_CRITICAL.format(hop=bottleneck["hop"], host=bottleneck["host"])
-        logger.warning(f"CRITICAL path fault at hop {bottleneck['hop']} ({bottleneck['host']}): {bottleneck['loss']:.1f}% loss, inherited downstream.")
-    elif bottleneck["loss"] > CRITICAL_LOSS_THRESHOLD:
-        analysis["suggestion"] = SUGGESTION_UNSTABLE.format(hop=bottleneck["hop"], host=bottleneck["host"])
-        logger.warning(f"Unstable connection at hop {bottleneck['hop']} ({bottleneck['host']}): {bottleneck['loss']:.1f}% loss.")
+        analysis["suggestion"] = SUGGESTION_RATE_LIMITED.format(hop=b_data["hop"], host=b_data["host"])
+        logger.info(f"Hop {b_data['hop']} rate-limited")
+    elif b_data["loss"] > CRITICAL_LOSS_THRESHOLD and analysis["forwardloss_inherited"]:
+        analysis["suggestion"] = SUGGESTION_CRITICAL.format(hop=b_data["hop"], host=b_data["host"])
+        logger.warning(f"Critical fault at hop {b_data['hop']}")
+    elif b_data["loss"] > CRITICAL_LOSS_THRESHOLD:
+        analysis["suggestion"] = SUGGESTION_UNSTABLE.format(hop=b_data["hop"], host=b_data["host"])
+        logger.warning(f"Unstable hop {b_data['hop']}")
     elif analysis["elevated"]:
-        analysis["suggestion"] = SUGGESTION_ELEVATED.format(loss=bottleneck["loss"], hop=bottleneck["hop"], host=bottleneck["host"])
-        logger.info(f"Elevated loss at hop {bottleneck['hop']} ({bottleneck['host']}): {bottleneck['loss']:.1f}% — below critical threshold.")
+        analysis["suggestion"] = SUGGESTION_ELEVATED.format(loss=b_data["loss"], hop=b_data["hop"], host=b_data["host"])
+        logger.info(f"Elevated loss at hop {b_data['hop']}")
     else:
         analysis["suggestion"] = SUGGESTION_HEALTHY
 

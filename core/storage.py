@@ -2,6 +2,7 @@ import sqlite3
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 
 DB_FILE = os.getenv("NMPL_DB_FILE", "nmpl_analytics.db")
 EPHEMERAL_METRICS = os.getenv("NMPL_EPHEMERAL_METRICS", "true").lower() == "true"
@@ -16,13 +17,16 @@ def _timestamp_value() -> str:
 class DatabaseLockedError(Exception):
     pass
 
+
 class StorageManager:
-    def __init__(self):
-        self.db_file = DB_FILE
+    def __init__(self, db_path=None):
+        self.db_path = Path(db_path) if db_path else Path(DB_FILE)
+        self.db_file = str(self.db_path)
 
     def _connect(self):
         conn = sqlite3.connect(self.db_file)
         conn.execute(f"PRAGMA busy_timeout = {DB_BUSY_TIMEOUT_MS}")
+        conn.execute("PRAGMA journal_mode = WAL")
         return conn
 
     def init_storage(self):
@@ -81,7 +85,6 @@ class StorageManager:
                 )
             """)
 
-            # Backfill columns for DBs created before these existed.
             metrics_cols = {row[1] for row in conn.execute("PRAGMA table_info(metrics_timeline)")}
             if "source" not in metrics_cols:
                 conn.execute("ALTER TABLE metrics_timeline ADD COLUMN source TEXT")
@@ -194,6 +197,13 @@ class StorageManager:
                     SET resolved_flag = 1, resolved_at = ?, last_updated_at = ?
                     WHERE id = ?
                 """, (now, now, incident_id))
+        return self._execute_write(_write)
+
+    def delete_incident(self, incident_id: int) -> bool:
+        def _write():
+            with self._connect() as conn:
+                cur = conn.execute("DELETE FROM network_incidents WHERE id = ?", (incident_id,))
+                return cur.rowcount > 0
         return self._execute_write(_write)
 
     def get_incident(self, incident_id):
