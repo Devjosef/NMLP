@@ -109,12 +109,7 @@
                     {% set resolved = inc[8] %}
                     {% set bottleneck_host = inc[5] %}
                     {% set bottleneck_loss = inc[6] %}
-                    <tr class="incident-row {% if resolved %}resolved-row{% endif %}"
-                        hx-get="/partials/route/{{ inc_id }}"
-                        hx-target="#detail-{{ inc_id }}"
-                        hx-swap="innerHTML"
-                        onclick="document.getElementById('row-detail-{{ inc_id }}').classList.toggle('hidden-row'); this.parentNode ? null : null;"
-                        _="on click toggle .hidden-row on #row-detail-{{ inc_id }}">
+                    <tr class="incident-row {% if resolved %}resolved-row{% endif %}" data-incident-id="{{ inc_id }}">
                         <td class="mono text-muted">{{ inc[1] }}</td>
                         <td class="target-name">{{ inc[2] }}</td>
                         <td>

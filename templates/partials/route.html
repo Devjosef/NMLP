@@ -26,6 +26,12 @@
                     <span class="{% if is_bottleneck %}text-red{% else %}text-muted{% endif %}" style="font-weight: 500; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; display: block;" title="{{ hop_host }}">
                         {{ hop_host.split('.')[-2:]|join('.') if hop_host and '.' in hop_host else hop_host or '*' }}
                     </span>
+                    {% set enrichment = hop.get('enrichment') if hop is mapping else None %}
+                    {% if enrichment and enrichment.status == 'confirmed' %}
+                        <span class="text-cyan" style="font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; display: block;" title="Confirmed via {{ enrichment.source }}">
+                            {{ enrichment.org }}
+                        </span>
+                    {% endif %}
                     <span style="color: #ffffff;">{{ hop_delay if hop_delay is not none else 0 }}<span style="color: #4b5563;">ms</span></span>
                     {% if hop_loss and hop_loss|float > 0 %}
                         <span class="text-red" style="font-weight: 600;">{{ hop_loss }}%</span>
