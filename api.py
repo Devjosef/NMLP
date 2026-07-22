@@ -30,6 +30,7 @@ from slowapi.errors import RateLimitExceeded
 from core import __main__
 from core.detect import Detector
 from core.storage import StorageManager
+from core.enrichment import enrich_hops
 
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -105,6 +106,8 @@ def _evaluate_and_route_incident_sync(target):
         if not incident_payload.get("hops"):
             logger.warning(f"MTR trace for {target} returned no hop data — skipping incident record.")
             return
+
+        incident_payload["hops"] = enrich_hops(incident_payload["hops"])
 
         open_incident = db.get_open_incident(target)
         if open_incident:
@@ -482,17 +485,6 @@ def partial_route(request: Request, incident_id: int):
     return templates.TemplateResponse(request=request, name="partials/route.html", context={"hops": hops, "analysis": analysis})
 
 
-@app.delete("/targets")
-@app.delete("/targets/")
-@limiter.limit(DELETE_RATE_LIMIT)
-async def delete_target_empty(request: Request):
-    """
-    Catch-all fallback route to intercept empty, trailing, or malformed target deletions
-    resulting from HTTP parameters parsing queries (such as /targets/??? -> /targets/?).
-    """
-    raise HTTPException(status_code=400, detail="Invalid target")
-
-
 @app.delete("/targets/{target}")
 @limiter.limit(DELETE_RATE_LIMIT)
 async def delete_target(request: Request, target: str):
@@ -637,20 +629,70 @@ async def generate_report(request: Request, incident_id: str, target: Optional[s
         hops = raw_log.get("hops", [])
         resolved = bool(row[8]) if len(row) > 8 else False
 
-        report_lines.extend([
-            f"Status: FAILURE",
-            f"Incident Reference: INC-{inc_id:03d}",
-            f"Target Destination: {row[2]}",
-            f"Root Fault Summary: {row[3]}",
-            f"Localized Bottleneck: Hop {row[4] if len(row) > 4 else 'N/A'} ({row[5] if len(row) > 5 else 'Unknown'})"
-        ])
+        # Check stored analysis (in the JSON payload) to prevent assigning fault for cosmetic ICMP rate-limiting.
+        analysis_data = raw_log.get("analyzer") or raw_log.get("analysis") or {}
+        likely_rate_limited = analysis_data.get("likely_rate_limited", False)
+        latency_spike_isolated = analysis_data.get("latency_spike_isolated")
+
+        bottleneck_host = row[5] if len(row) > 5 else None
+        bottleneck_enrichment = next(
+            (h.get("enrichment") for h in hops if h.get("host") == bottleneck_host and h.get("enrichment")),
+            None
+        )
+
+        bottleneck_provider_line = ""
+        if bottleneck_enrichment and bottleneck_enrichment.get("status") == "confirmed":
+            if likely_rate_limited:
+                # DO NOT BLAME OPERATORS FOR COSMETIC LOSS (rate-limited ICMP)
+                bottleneck_provider_line = (
+                    f"Note: Hop {row[4] if len(row) > 4 else 'N/A'} ({bottleneck_enrichment['org']}, "
+                    f"confirmed via {bottleneck_enrichment['source']}) shows elevated loss, but the "
+                    f"destination remains clean — this pattern typically indicates ICMP rate-limiting "
+                    f"at that router, not a real forwarding fault. Not asserted as the cause of any "
+                    f"end-to-end degradation."
+                )
+            elif bottleneck_enrichment.get("asn"):
+                bottleneck_provider_line = (
+                    f"Bottleneck Operator: {bottleneck_enrichment['org']} "
+                    f"(AS{bottleneck_enrichment['asn']}, confirmed via {bottleneck_enrichment['source']})"
+                )
+            else:
+                bottleneck_provider_line = (
+                    f"Bottleneck Operator: {bottleneck_enrichment['org']} "
+                    f"(confirmed via {bottleneck_enrichment['source']})"
+                )
+
+        latency_spike_note = ""
+        if latency_spike_isolated:
+            latency_spike_note = (
+                f"Note: Hop {latency_spike_isolated.get('hop')} ({latency_spike_isolated.get('host')}) "
+                f"shows an isolated latency spike that recovers by the next hop — likely ICMP reply "
+                f"deprioritization on that router's control plane, not added forwarding delay. "
+                f"Not asserted as evidence of a real latency fault."
+            )
+
+        report_lines.extend(
+            [
+                f"Status: FAILURE",
+                f"Incident Reference: INC-{inc_id:03d}",
+                f"Target Destination: {row[2]}",
+                f"Root Fault Summary: {row[3]}",
+                f"Localized Bottleneck: Hop {row[4] if len(row) > 4 else 'N/A'} ({row[5] if len(row) > 5 else 'Unknown'})",
+            ]
+            + ([bottleneck_provider_line] if bottleneck_provider_line else [])
+            + ([latency_spike_note] if latency_spike_note else [])
+        )
 
         for hop in hops:
             h_num = hop.get("hop", "?")
             h_host = hop.get("host", "*")
             h_loss = hop.get("loss", "0.0")
-            h_delay = hop.get("delay", "0.0")
-            report_lines.append(f"Hop {h_num} | Host/IP: {h_host} | Loss: {h_loss}% | Delay: {h_delay}ms")
+            h_delay = hop.get("delay", hop.get("avg", "0.0"))
+            enrichment = hop.get("enrichment") or {}
+            provider_note = ""
+            if enrichment.get("status") == "confirmed":
+                provider_note = f" [{enrichment['org']}, confirmed via {enrichment['source']}]"
+            report_lines.append(f"Hop {h_num} | Host/IP: {h_host} | Loss: {h_loss}% | Delay: {h_delay}ms{provider_note}")
 
         json_payload = {
             "meta": {
@@ -664,8 +706,10 @@ async def generate_report(request: Request, incident_id: str, target: Optional[s
                 "bottleneck": {
                     "hop": row[4] if len(row) > 4 else None,
                     "host": row[5] if len(row) > 5 else None,
-                    "loss_pct": row[6] if len(row) > 6 else None
+                    "loss_pct": row[6] if len(row) > 6 else None,
+                    "likely_rate_limited": likely_rate_limited,
                 },
+                "latency_spike_isolated": latency_spike_isolated,
                 "nested_hops_trace": hops
             }
         }
