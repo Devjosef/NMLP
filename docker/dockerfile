@@ -1,0 +1,31 @@
+# Pinned to match the local Python 3.13 development environment execution cycle
+FROM python:3.13-slim@sha256:4efa69bf17cfbd83a9942e60e2642335c3b397448e00410063a0421f9727c4c4
+
+# System utilities required for running native POSIX network subprocess monitoring hooks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    mtr-tiny \
+    iputils-ping \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Docker looks for requirements.txt in the root context
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copies all root application files into the container image
+COPY . .
+
+RUN mkdir -p /data /app/reports
+
+ENV NMPL_DB_FILE=/data/nmpl_analytics.db
+ENV NMPL_API_HOST=0.0.0.0
+ENV NMPL_API_PORT=8000
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/ || exit 1
+
+CMD ["python3", "api.py"]
