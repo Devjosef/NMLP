@@ -15,8 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 from core import __main__
 from core.detect import Detector
 from core.storage import StorageManager
+from core.enrichment import enrich_hops
 
-# Configuration from env
 BASE_DIR = Path(__file__).parent
 REPORTS_DIR = BASE_DIR / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
@@ -48,6 +48,9 @@ def evaluate_and_route_incident(engine_args, target):
         if not incident_payload.get("hops"):
             print(f"[{datetime.now().strftime('%H:%M:%S')}] MTR trace for {target} returned no hop data — skipping incident record.")
             return
+
+        # Non-blocking best-effort enrichment; preserves raw hop data on failure.
+        incident_payload["hops"] = enrich_hops(incident_payload["hops"])
 
         open_incident = db.get_open_incident(target)
         if open_incident:
@@ -192,11 +195,13 @@ def run_daemon(initial_targets, interval=3.0, base_args=None):
                 targets = db.get_active_targets()
 
                 if targets:
-                    try:
-                        # Wrap collection to protect the loop from deferred task exceptions
-                        list(executor.map(probe_worker, targets))
-                    except Exception as loop_exc:
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Daemon cycle error: {loop_exc}")
+                    futures = {executor.submit(probe_worker, t): t for t in targets}
+                    for future in futures:
+                        target = futures[future]
+                        try:
+                            future.result()
+                        except Exception as exc:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] [{target}] Unhandled scheduling exception: {exc}")
 
                 time.sleep(max(0.1, interval - (time.time() - loop_start)))
     except KeyboardInterrupt:
